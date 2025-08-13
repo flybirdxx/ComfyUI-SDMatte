@@ -1,0 +1,10 @@
+diffusers>=0.25.0
+transformers>=4.38.0
+timm>=0.9.7
+einops>=0.7.0
+easydict>=1.10
+omegaconf>=2.3.0
+fvcore>=0.1.5.post20221221
+torchvision>=0.16.0
+opencv-python>=4.8.0
+

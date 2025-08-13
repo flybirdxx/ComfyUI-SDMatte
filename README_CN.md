@@ -1,0 +1,193 @@
+# ComfyUI-SDMatte
+
+[English](README_EN.md) | 简体中文
+
+基于 [SDMatte](https://github.com/vivoCameraResearch/SDMatte) 的 ComfyUI 自定义节点插件，用于交互式图像抠图。
+
+## 📖 简介
+
+SDMatte 是一个基于稳定扩散（Stable Diffusion）的交互式图像抠图方法，由 vivo 摄像研究团队开发，已被 ICCV 2025 接收。该方法利用预训练扩散模型的强大先验知识，支持多种视觉提示（点、框、掩码）来精确提取自然图像中的目标对象。
+
+本插件将 SDMatte 集成到 ComfyUI 中，提供简洁易用的节点接口，专注于 trimap 引导的抠图功能，并内置了多种 VRAM 优化策略。
+
+## ✨ 特性
+
+- 🎯 **高精度抠图**：基于扩散模型的强大先验，能够处理复杂边缘细节
+- 🖼️ **Trimap 引导**：支持三值图（trimap）引导的精确抠图
+- 🚀 **VRAM 优化**：内置混合精度、注意力切片等多种显存优化策略
+- 🔧 **ComfyUI 集成**：完全兼容 ComfyUI 工作流系统
+- 📱 **灵活尺寸**：支持多种推理分辨率（512-1024px）
+
+## 🛠️ 安装
+
+### 1. 下载插件
+
+将本插件放置到 ComfyUI 的自定义节点目录：
+
+```bash
+cd ComfyUI/custom_nodes/
+git clone https://github.com/flybirdxx/ComfyUI-SDMatte.git
+```
+
+### 2. 安装依赖
+
+ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
+
+- diffusers
+- timm
+- einops
+- lazyconfig
+
+### 3. 准备模型文件
+
+#### 下载 SDMatte 权重
+
+从 [Hugging Face](https://huggingface.co/LongfeiHuang/SDMatte) 下载 SDMatte 模型权重：
+
+**标准版本（SDMatte）：**
+```bash
+# 下载标准版本权重文件
+wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte.pth
+```
+
+**增强版本（SDMatte*）：**
+```bash
+# 下载增强版本权重文件（更高精度，更大模型）
+wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth
+```
+
+将下载的权重文件放置到 ComfyUI 的 checkpoints 目录：
+
+```
+ComfyUI/models/checkpoints/
+├── SDMatte.pth          # 标准版本
+└── SDMatte_plus.pth     # 增强版本
+```
+
+**模型选择建议：**
+- **SDMatte.pth**：标准版本，平衡性能和质量，推荐日常使用
+- **SDMatte_plus.pth**：增强版本，更高精度但需要更多显存和计算时间，适合高质量需求
+
+
+### 4. 重启 ComfyUI
+
+重启 ComfyUI 以加载新的自定义节点。
+
+## 🎮 使用方法
+
+### 节点说明
+
+#### SDMatte Model Loader（SDMatte 模型加载器）
+
+- **功能**：加载 SDMatte 模型
+- **输入**：
+  - `ckpt_name`：选择 checkpoints 目录中的 SDMatte.pth 文件
+- **输出**：
+  - `SDMATTE_MODEL`：加载好的 SDMatte 模型
+
+#### SDMatte Apply（SDMatte 应用）
+
+- **功能**：使用 SDMatte 模型进行抠图
+- **输入**：
+  - `sdmatte_model`：来自模型加载器的 SDMatte 模型
+  - `image`：输入图像（ComfyUI IMAGE 格式）
+  - `trimap`：三值图掩码（ComfyUI MASK 格式）
+  - `inference_size`：推理分辨率（512/640/768/896/1024）
+  - `is_transparent`：图像是否包含透明区域
+  - `force_cpu`：强制使用 CPU 推理（可选）
+- **输出**：
+  - `MASK`：抠图结果的 alpha 遮罩
+
+### 基础工作流
+
+1. **Load Image**：加载需要抠图的图像
+2. **创建 Trimap**：使用绘图工具或其他节点创建三值图
+   - 黑色（0）：确定背景
+   - 白色（1）：确定前景  
+   - 灰色（0.5）：未知区域
+3. **SDMatte Model Loader**：加载 SDMatte 模型
+4. **SDMatte Apply**：应用抠图
+5. **Preview Image**：预览抠图结果
+
+### 推荐设置
+
+- **推理分辨率**：1024（最高质量）或 768（平衡性能）
+- **透明标志**：根据输入图像是否有透明通道设置
+- **强制 CPU**：仅在 GPU 显存不足时使用
+
+## 🔧 技术细节
+
+### 数据处理
+
+- **输入图像**：自动调整到推理分辨率，归一化到 [-1, 1]
+- **Trimap**：调整到推理分辨率，映射到 [-1, 1] 范围
+- **输出**：调整回原始分辨率，clamp 到 [0, 1] 范围
+
+### VRAM 优化
+
+插件内置多种显存优化策略（自动启用）：
+
+- **混合精度**：使用 FP16 autocast 减少显存占用
+- **注意力切片**：SlicedAttnProcessor(slice_size=1) 最大化显存节省
+- **显存清理**：推理前后自动清理 CUDA 缓存
+- **设备管理**：智能的设备分配和模型移动
+
+### 模型加载
+
+- **权重格式**：支持 .pth 和 .safetensors 格式
+- **安全加载**：处理 omegaconf 对象，支持 weights_only 模式
+- **嵌套结构**：自动处理复杂的 checkpoint 结构
+- **错误恢复**：多重fallback机制确保加载成功
+
+## ❓ 常见问题
+
+### Q: 节点无法被搜索到？
+A: 确保插件目录结构正确，重启 ComfyUI，检查控制台是否有错误信息。
+
+### Q: 模型加载失败？
+A: 检查 SDMatte.pth 文件路径，确保基础模型目录结构完整，查看控制台详细错误信息。
+
+### Q: 推理时显存不足？
+A: 尝试降低推理分辨率，启用 `force_cpu` 选项，或关闭其他占用显存的程序。
+
+### Q: 抠图效果不理想？
+A: 优化 trimap 质量，确保前景/背景/未知区域标注准确，尝试不同的推理分辨率。
+
+### Q: 首次推理很慢？
+A: 首次运行需要编译 CUDA 内核，后续推理会显著加速。
+
+### Q: 应该选择哪个模型版本？
+A: 
+- **SDMatte.pth（标准版）**：文件较小（~11GB），推理速度快，适合大多数场景
+- **SDMatte_plus.pth（增强版）**：文件较大，精度更高，适合对质量要求极高的专业用途
+- 建议先使用标准版测试，如需更高质量再升级到增强版
+
+## 📋 系统要求
+
+- **ComfyUI**：最新版本
+- **Python**：3.8+
+- **PyTorch**：1.12+ （支持 CUDA 推荐）
+- **显存**：8GB+ 推荐（支持 CPU 推理）
+- **依赖**：diffusers, timm, einops, lazyconfig
+
+## 📚 参考
+
+- **原始论文**：[SDMatte: Grafting Diffusion Models for Interactive Matting](https://arxiv.org/abs/2408.00321) (ICCV 2025)
+- **原始代码**：[vivoCameraResearch/SDMatte](https://github.com/vivoCameraResearch/SDMatte)
+- **模型权重**：[LongfeiHuang/SDMatte](https://huggingface.co/LongfeiHuang/SDMatte)
+
+## 📄 许可证
+
+本项目遵循 MIT 许可证。原始 SDMatte 项目同样使用 MIT 许可证。
+
+## 🙏 致谢
+
+感谢 vivo 摄像研究团队开发的优秀 SDMatte 模型，以及 Stable Diffusion、ComfyUI 社区的贡献。
+
+## 📧 支持
+
+如有问题或建议，请在 GitHub 上提交 Issue。
+
+---
+
+**注意**：本插件为第三方实现，与原始 SDMatte 团队无直接关联。使用前请确保遵循相关许可证条款。
