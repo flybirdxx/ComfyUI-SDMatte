@@ -10,6 +10,25 @@ SDMatte is an interactive image matting method based on Stable Diffusion, develo
 
 This plugin integrates SDMatte into ComfyUI, providing a simple and easy-to-use node interface focused on trimap-guided matting functionality with built-in VRAM optimization strategies.
 
+## 🖼️ Examples
+
+### Matting Results
+
+<table>
+  <tr>
+    <td align="center"><strong>Original Image</strong></td>
+    <td align="center"><strong>Trimap</strong></td>
+    <td align="center"><strong>Matting Result</strong></td>
+  </tr>
+  <tr>
+    <td><img src="example_workflow/test_1.png" width="200"/></td>
+    <td><img src="example_workflow/test_2.png" width="200"/></td>
+    <td><em>Alpha mask output</em></td>
+  </tr>
+</table>
+
+*Example workflow demonstrating SDMatte's high-precision matting capabilities with trimap guidance.*
+
 ## ✨ Features
 
 - 🎯 **High-Precision Matting**: Based on powerful diffusion model priors, capable of handling complex edge details

@@ -1,6 +1,6 @@
 # ComfyUI-SDMatte
 
-[English](README_EN.md) | 简体中文
+[English](README_CN.md) | 简体中文
 
 基于 [SDMatte](https://github.com/vivoCameraResearch/SDMatte) 的 ComfyUI 自定义节点插件，用于交互式图像抠图。
 
@@ -9,6 +9,25 @@
 SDMatte 是一个基于稳定扩散（Stable Diffusion）的交互式图像抠图方法，由 vivo 摄像研究团队开发，已被 ICCV 2025 接收。该方法利用预训练扩散模型的强大先验知识，支持多种视觉提示（点、框、掩码）来精确提取自然图像中的目标对象。
 
 本插件将 SDMatte 集成到 ComfyUI 中，提供简洁易用的节点接口，专注于 trimap 引导的抠图功能，并内置了多种 VRAM 优化策略。
+
+## 🖼️ 示例
+
+### 抠图效果
+
+<table>
+  <tr>
+    <td align="center"><strong>原始图像</strong></td>
+    <td align="center"><strong>三值图</strong></td>
+    <td align="center"><strong>抠图结果</strong></td>
+  </tr>
+  <tr>
+    <td><img src="example_workflow/test_1.png" width="200"/></td>
+    <td><img src="example_workflow/test_2.png" width="200"/></td>
+    <td><em>Alpha 遮罩输出</em></td>
+  </tr>
+</table>
+
+*示例工作流展示了 SDMatte 基于三值图引导的高精度抠图能力。*
 
 ## ✨ 特性
 
@@ -50,7 +69,7 @@ ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
 wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte.pth
 ```
 
-**增强版本（SDMatte*）：**
+**增强版本（SDMatte+）：**
 ```bash
 # 下载增强版本权重文件（更高精度，更大模型）
 wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth
@@ -67,7 +86,6 @@ ComfyUI/models/checkpoints/
 **模型选择建议：**
 - **SDMatte.pth**：标准版本，平衡性能和质量，推荐日常使用
 - **SDMatte_plus.pth**：增强版本，更高精度但需要更多显存和计算时间，适合高质量需求
-
 
 ### 4. 重启 ComfyUI
 
