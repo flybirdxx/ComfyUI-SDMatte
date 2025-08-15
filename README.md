@@ -188,8 +188,40 @@ A:
 - **VRAM**: 8GB+ recommended (CPU inference supported)
 - **Dependencies**: diffusers, timm, einops, lazyconfig
 
+## 📝 Changelog
+
+### v1.2.0 (2025-08-15)
+- ✨ **New Features**:
+  - Added image output alongside alpha mask output
+  - Support for transparent background matting mode
+  - Added multiple output modes: `alpha_only`, `matted_rgba`, `matted_rgb`
+  - Added mask refinement feature using trimap constraints to filter unwanted regions
+  - Added `trimap_constraint` parameter to control constraint strength
+  - Added detailed tooltips for all parameters
+- 🔧 **Improvements**:
+  - Improved alpha mask processing logic to reduce background interference
+  - Optimized foreground region extraction algorithm
+  - Enhanced low-confidence region filtering mechanism
+- 📚 **Documentation**:
+  - Added example workflow links
+  - Added video tutorial links
+  - Improved usage instructions and parameter explanations
+- 🔧 **Improvements**:
+  - Improved VRAM optimization strategies
+  - Enhanced model loading stability
+  - Optimized inference performance
+
+### v1.0.0 (2025-08-14)
+- 🎉 **Initial Release**:
+  - Basic SDMatte model integration
+  - Support for trimap-guided matting
+  - Built-in VRAM optimization features
+  - Support for multiple inference resolutions
+
 ## 📚 References
 
+- **Example Workflow**: [Superior Image Cropping and Mask Refinement Workflow](https://www.runninghub.ai/post/1955928733028941826)
+- **Video Tutorial**: [ComfyUI-SDMatte Tutorial](https://www.youtube.com/watch?v=PDGDTJvdo8Q)
 - **Original Paper**: [SDMatte: Grafting Diffusion Models for Interactive Matting](https://arxiv.org/abs/2408.00321) (ICCV 2025)
 - **Original Code**: [vivoCameraResearch/SDMatte](https://github.com/vivoCameraResearch/SDMatte)
 - **Model Weights**: [LongfeiHuang/SDMatte](https://huggingface.co/LongfeiHuang/SDMatte)
