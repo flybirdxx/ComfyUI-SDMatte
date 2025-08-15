@@ -226,6 +226,8 @@ A:
 
 ## 📚 References
 
+- **Example Workflow**: [Superior Image Cropping and Mask Refinement Workflow](https://www.runninghub.ai/post/1955928733028941826)
+- **Video Tutorial**: [ComfyUI-SDMatte Tutorial](https://www.youtube.com/watch?v=PDGDTJvdo8Q)
 - **Original Paper**: [SDMatte: Grafting Diffusion Models for Interactive Matting](https://arxiv.org/abs/2408.00321) (ICCV 2025)
 - **Original Code**: [vivoCameraResearch/SDMatte](https://github.com/vivoCameraResearch/SDMatte)
 - **Model Weights**: [LongfeiHuang/SDMatte](https://huggingface.co/LongfeiHuang/SDMatte)

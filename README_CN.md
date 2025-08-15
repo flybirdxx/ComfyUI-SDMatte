@@ -225,6 +225,8 @@ A:
 
 ## 📚 参考
 
+- **示例工作流**：[高级抠图与遮罩优化工作流](https://www.runninghub.ai/post/1955928733028941826?inviteCode=rh-v1041)
+- **视频教程**：[ComfyUI-SDMatte 使用教程](https://www.bilibili.com/video/BV1L6bzz8Ene/?spm_id_from=333.1387.homepage.video_card.click&vd_source=b340fd050dbe0d3e2ce863af909f1ee8)
 - **原始论文**：[SDMatte: Grafting Diffusion Models for Interactive Matting](https://arxiv.org/abs/2408.00321) (ICCV 2025)
 - **原始代码**：[vivoCameraResearch/SDMatte](https://github.com/vivoCameraResearch/SDMatte)
 - **模型权重**：[LongfeiHuang/SDMatte](https://huggingface.co/LongfeiHuang/SDMatte)
