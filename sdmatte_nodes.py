@@ -331,7 +331,6 @@ class SDMatteApply:
                 image.cpu() * alpha_expanded,
                 alpha_expanded.expand(-1, -1, -1, 1)
             ], dim=-1)
-            matted_image = matted_image[..., :3]
         elif output_mode == "matted_rgb":
             trimap_cpu = trimap.cpu()
             trimap_expanded = trimap_cpu.unsqueeze(-1)
