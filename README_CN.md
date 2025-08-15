@@ -4,6 +4,12 @@
 
 基于 [SDMatte](https://github.com/vivoCameraResearch/SDMatte) 的 ComfyUI 自定义节点插件，用于交互式图像抠图。
 
+## 🚀 快速开始
+
+> 📺 **视频教程**：[ComfyUI-SDMatte 使用教程](https://www.bilibili.com/video/BV1L6bzz8Ene/?spm_id_from=333.1387.homepage.video_card.click&vd_source=b340fd050dbe0d3e2ce863af909f1ee8)  
+> 🔧 **示例工作流**：[高级抠图与遮罩优化工作流](https://www.runninghub.ai/post/1955928733028941826?inviteCode=rh-v1041)  
+> 💡 **推荐**：先观看视频教程了解使用方法，再下载工作流进行实践
+
 ## 📖 简介
 
 SDMatte 是一个基于稳定扩散（Stable Diffusion）的交互式图像抠图方法，由 vivo 摄像研究团队开发，已被 ICCV 2025 接收。该方法利用预训练扩散模型的强大先验知识，支持多种视觉提示（点、框、掩码）来精确提取自然图像中的目标对象。
@@ -187,6 +193,35 @@ A:
 - **PyTorch**：1.12+ （支持 CUDA 推荐）
 - **显存**：8GB+ 推荐（支持 CPU 推理）
 - **依赖**：diffusers, timm, einops, lazyconfig
+
+## 📝 版本更新日志
+
+### v1.2.0 (2025-08-15)
+- ✨ **新增功能**：
+  - 添加图像输出，同时输出alpha遮罩和抠图结果
+  - 支持透明背景抠图模式
+  - 添加多种输出模式：`alpha_only`、`matted_rgba`、`matted_rgb`
+  - 新增遮罩优化功能，使用trimap约束过滤不需要的区域
+  - 添加 `trimap_constraint` 参数控制约束强度
+  - 为所有参数添加详细的tooltip说明
+- 🔧 **优化改进**：
+  - 改进alpha遮罩处理逻辑，减少背景干扰
+  - 优化前景区域提取算法
+  - 增强低置信度区域过滤机制
+- 📚 **文档更新**：
+  - 添加示例工作流链接
+  - 添加视频教程链接
+- 🔧 **优化改进**：
+  - 改进VRAM优化策略
+  - 增强模型加载稳定性
+  - 优化推理性能
+
+### v1.0.0 (2025-08-14)
+- 🎉 **初始版本**：
+  - 基础SDMatte模型集成
+  - 支持trimap引导抠图
+  - 内置VRAM优化功能
+  - 支持多种推理分辨率
 
 ## 📚 参考
 

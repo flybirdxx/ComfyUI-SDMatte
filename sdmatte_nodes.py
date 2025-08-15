@@ -140,22 +140,44 @@ class SDMatteApply:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "sdmatte_model": ("SDMATTE_MODEL",),
-                "image": ("IMAGE",),
-                "trimap": ("MASK",),
-                "inference_size": ([512, 640, 768, 896, 1024], {"default": 1024}),
-                "is_transparent": ("BOOLEAN", {"default": False}),
+                "sdmatte_model": ("SDMATTE_MODEL", {"tooltip": "已加载的SDMatte模型，来自SDMatte Model Loader节点"}),
+                "image": ("IMAGE", {"tooltip": "需要进行抠图的输入图像"}),
+                "trimap": ("MASK", {"tooltip": "三值图掩码：白色=前景，黑色=背景，灰色=未知区域"}),
+                "inference_size": ([512, 640, 768, 896, 1024], {
+                    "default": 1024, 
+                    "tooltip": "推理分辨率，越高质量越好但速度越慢。推荐1024(最高质量)或768(平衡性能)"
+                }),
+                "is_transparent": ("BOOLEAN", {
+                    "default": False, 
+                    "tooltip": "输入图像是否包含透明通道。如果原图有透明背景请启用"
+                }),
+                "output_mode": (["alpha_only", "matted_rgba", "matted_rgb"], {
+                    "default": "alpha_only",
+                    "tooltip": "输出模式：alpha_only=只输出遮罩；matted_rgba=透明背景抠图；matted_rgb=黑色背景抠图(推荐，避免干扰)"
+                }),
+                "mask_refine": ("BOOLEAN", {
+                    "default": True, 
+                    "tooltip": "启用遮罩优化，使用trimap约束过滤不需要的区域，减少背景干扰"
+                }),
+                "trimap_constraint": ("FLOAT", {
+                    "default": 0.8, "min": 0.1, "max": 1.0, "step": 0.1,
+                    "tooltip": "trimap约束强度(0.1-1.0)。越高约束越严格，0.8=平衡，0.9=严格过滤，0.6=宽松保留"
+                }),
             },
             "optional": {
-                "force_cpu": ("BOOLEAN", {"default": False}),
+                "force_cpu": ("BOOLEAN", {
+                    "default": False, 
+                    "tooltip": "强制使用CPU推理。仅在GPU显存不足时启用，会显著降低速度"
+                }),
             },
         }
 
-    RETURN_TYPES = ("MASK",)
+    RETURN_TYPES = ("MASK", "IMAGE")
+    RETURN_NAMES = ("alpha_mask", "matted_image")
     FUNCTION = "apply_matte"
     CATEGORY = "Matting/SDMatte"
 
-    def apply_matte(self, sdmatte_model, image, trimap, inference_size, is_transparent, force_cpu=False):
+    def apply_matte(self, sdmatte_model, image, trimap, inference_size, is_transparent, output_mode, mask_refine, trimap_constraint, force_cpu=False):
         device = comfy.model_management.get_torch_device()
         if force_cpu:
             device = torch.device('cpu')
@@ -175,7 +197,6 @@ class SDMatteApply:
                     from diffusers.models.attention_processor import SlicedAttnProcessor
                     # 使用适中的切片大小平衡性能和显存
                     unet.set_attn_processor(SlicedAttnProcessor(slice_size=1))
-                    print('[SDMatte] 已启用注意力切片优化')
             except Exception as e:
                 print(f'[SDMatte] 注意力优化跳过: {e}')
 
@@ -209,7 +230,64 @@ class SDMatteApply:
         # 还原到原尺寸
         out = transforms.Resize((orig_h, orig_w))(pred_alpha)
         out = out.squeeze(1).clamp(0, 1).detach().cpu()
-
+        
+        # 遮罩优化：使用trimap约束来过滤不需要的区域
+        if mask_refine:
+            trimap_cpu = trimap.cpu()  # (B, H, W)
+            
+            # 创建严格的前景约束
+            # 只在trimap明确标记为前景(白色区域)的地方保留高alpha值
+            # 在未知区域(灰色)允许模型输出，但在背景区域(黑色)强制为0
+            foreground_regions = trimap_cpu > trimap_constraint  # 前景区域
+            background_regions = trimap_cpu < (1.0 - trimap_constraint)  # 背景区域
+            unknown_regions = ~(foreground_regions | background_regions)  # 未知区域
+            
+            # 优化alpha遮罩
+            refined_alpha = out.clone()
+            
+            # 背景区域强制为0
+            refined_alpha[background_regions] = 0.0
+            
+            # 前景区域保持原值或增强
+            refined_alpha[foreground_regions] = torch.clamp(refined_alpha[foreground_regions] * 1.2, 0, 1)
+            
+            # 未知区域保持模型输出，但应用阈值过滤
+            alpha_threshold = 0.3  # 过滤掉低置信度的区域
+            low_confidence = (refined_alpha < alpha_threshold) & unknown_regions
+            refined_alpha[low_confidence] = 0.0
+            
+            out = refined_alpha
+        
+        # 根据输出模式创建不同的抠图结果
+        # out: (B, H, W), image: (B, H, W, C)
+        alpha_expanded = out.unsqueeze(-1)  # (B, H, W, 1)
+        
+        if output_mode == "alpha_only":
+            # 只输出alpha遮罩，图像输出为黑色
+            matted_image = torch.zeros_like(image.cpu())
+        elif output_mode == "matted_rgba":
+            # 创建RGBA图像：RGB通道保持原图，A通道为alpha遮罩
+            # 背景变为透明，只保留前景对象
+            matted_image = torch.cat([
+                image.cpu() * alpha_expanded,  # RGB通道应用遮罩
+                alpha_expanded.expand(-1, -1, -1, 1)  # A通道为遮罩本身
+            ], dim=-1)
+            # 确保输出仍为3通道（ComfyUI IMAGE格式）
+            matted_image = matted_image[..., :3]
+        elif output_mode == "matted_rgb":
+            # 只保留前景对象，背景变为黑色
+            # 使用trimap的前景信息来更精确地提取对象
+            trimap_cpu = trimap.cpu()  # (B, H, W)
+            trimap_expanded = trimap_cpu.unsqueeze(-1)  # (B, H, W, 1)
+            
+            # 只在trimap标记为前景(>0.8)或未知区域(0.2-0.8)的地方保留原图
+            # 结合alpha遮罩进一步细化
+            foreground_mask = (trimap_expanded > 0.2) & (alpha_expanded > 0.1)
+            matted_image = image.cpu() * foreground_mask.float()
+        else:
+            # 默认：直接应用alpha遮罩
+            matted_image = image.cpu() * alpha_expanded
+        
         # 推理后清理显存
         if device.type == 'cuda':
             try:
@@ -217,7 +295,7 @@ class SDMatteApply:
             except Exception:
                 pass
 
-        return (out,)
+        return (out, matted_image)
 
 
 NODE_CLASS_MAPPINGS = {

@@ -4,6 +4,12 @@ English | [简体中文](README_CN.md)
 
 ComfyUI custom nodes plugin based on [SDMatte](https://github.com/vivoCameraResearch/SDMatte) for interactive image matting.
 
+## 🚀 Quick Start
+
+> 📺 **Video Tutorial**: [ComfyUI-SDMatte Tutorial](https://www.youtube.com/watch?v=PDGDTJvdo8Q)  
+> 🔧 **Example Workflow**: [Superior Image Cropping and Mask Refinement Workflow](https://www.runninghub.ai/post/1955928733028941826)  
+> 💡 **Recommended**: Watch the video tutorial first to understand the usage, then download the workflow for practice
+
 ## 📖 Introduction
 
 SDMatte is an interactive image matting method based on Stable Diffusion, developed by the vivo Camera Research team and accepted by ICCV 2025. This method leverages the powerful priors of pre-trained diffusion models and supports multiple visual prompts (points, boxes, masks) for accurately extracting target objects from natural images.
@@ -187,6 +193,36 @@ A:
 - **PyTorch**: 1.12+ (CUDA support recommended)
 - **VRAM**: 8GB+ recommended (CPU inference supported)
 - **Dependencies**: diffusers, timm, einops, lazyconfig
+
+## 📝 Changelog
+
+### v1.2.0 (2025-08-15)
+- ✨ **New Features**:
+  - Added image output alongside alpha mask output
+  - Support for transparent background matting mode
+  - Added multiple output modes: `alpha_only`, `matted_rgba`, `matted_rgb`
+  - Added mask refinement feature using trimap constraints to filter unwanted regions
+  - Added `trimap_constraint` parameter to control constraint strength
+  - Added detailed tooltips for all parameters
+- 🔧 **Improvements**:
+  - Improved alpha mask processing logic to reduce background interference
+  - Optimized foreground region extraction algorithm
+  - Enhanced low-confidence region filtering mechanism
+- 📚 **Documentation**:
+  - Added example workflow links
+  - Added video tutorial links
+  - Improved usage instructions and parameter explanations
+- 🔧 **Improvements**:
+  - Improved VRAM optimization strategies
+  - Enhanced model loading stability
+  - Optimized inference performance
+
+### v1.0.0 (2025-08-14)
+- 🎉 **Initial Release**:
+  - Basic SDMatte model integration
+  - Support for trimap-guided matting
+  - Built-in VRAM optimization features
+  - Support for multiple inference resolutions
 
 ## 📚 References
 
