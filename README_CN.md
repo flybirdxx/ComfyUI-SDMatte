@@ -81,10 +81,10 @@ wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte.pth
 wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth
 ```
 
-将下载的权重文件放置到 ComfyUI 的 checkpoints 目录：
+将下载的权重文件放置到 ComfyUI 的 SDMatte 目录：
 
 ```
-ComfyUI/models/checkpoints/
+ComfyUI/models/SDMatte/
 ├── SDMatte.pth          # 标准版本
 └── SDMatte_plus.pth     # 增强版本
 ```
@@ -195,6 +195,10 @@ A:
 - **依赖**：diffusers, timm, einops, lazyconfig
 
 ## 📝 版本更新日志
+
+### v1.2.1
+  - 合并模型节点,更改模型路径为models/SDMatte
+  - 修复alpha图像输出与mask对齐问题
 
 ### v1.2.0 (2025-08-15)
 - ✨ **新增功能**：

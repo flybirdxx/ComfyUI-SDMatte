@@ -84,7 +84,7 @@ wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth
 Place the downloaded weight files in ComfyUI's checkpoints directory:
 
 ```
-ComfyUI/models/checkpoints/
+ComfyUI/models/SDMatte/
 ├── SDMatte.pth          # Standard version
 └── SDMatte_plus.pth     # Enhanced version
 ```
@@ -195,6 +195,10 @@ A:
 - **Dependencies**: diffusers, timm, einops, lazyconfig
 
 ## 📝 Changelog
+
+### v1.2.1 
+  - Merge model nodes, change model read path to models/SDMatte
+  - Fixed alpha image output alignment issue with mask
 
 ### v1.2.0 (2025-08-15)
 - ✨ **New Features**:
