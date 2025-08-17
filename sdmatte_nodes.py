@@ -8,116 +8,76 @@ import folder_paths
 import comfy
 from comfy.utils import load_torch_file
 
+
+# SDMatte Model Downloader
+# Correctly get the 'models' directory by finding the parent of the checkpoints directory
+models_dir = os.path.dirname(folder_paths.get_folder_paths("checkpoints")[0])
+MODEL_DIR = os.path.join(models_dir, "SDMatte")
+MODEL_URLS = {
+    "SDMatte.pth": "https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte.pth",
+    "SDMatte_plus.pth": "https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth"
+}
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+def download_model(model_name, models_dir=MODEL_DIR, model_urls=MODEL_URLS):
+    url = model_urls.get(model_name)
+    if not url:
+        raise ValueError(f"[SDMatte] Unknown model name: {model_name}")
+
+    target_path = os.path.join(models_dir, model_name)
+    
+    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
+        return target_path
+
+    print(f"[SDMatte] Model '{model_name}' not found. Downloading...")
+    
+    tmp_path = target_path + ".tmp"
+
+    try:
+        import requests
+        from tqdm import tqdm
+
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        total_size = int(response.headers.get('content-length', 0))
+        
+        with open(tmp_path, 'wb') as f, tqdm(
+            desc=model_name,
+            total=total_size,
+            unit='iB',
+            unit_scale=True,
+            unit_divisor=1024,
+        ) as bar:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    size = f.write(chunk)
+                    bar.update(size)
+        
+        os.rename(tmp_path, target_path)
+        print(f"[SDMatte] Download complete: {target_path}")
+        return target_path
+
+    except (ImportError, ModuleNotFoundError):
+        print("[SDMatte] Warning: 'requests' and 'tqdm' not found. Downloading without progress bar.")
+        import urllib.request
+        try:
+            urllib.request.urlretrieve(url, tmp_path)
+            os.rename(tmp_path, target_path)
+            print(f"[SDMatte] Download complete: {target_path}")
+            return target_path
+        except Exception as e_url:
+            print(f"[SDMatte] Error downloading with urllib: {e_url}")
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
+    except Exception as e:
+        print(f"[SDMatte] Error downloading model: {e}")
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
 # 延迟导入核心模型，避免在依赖未安装时阻断节点注册
 SDMatteCore = None
-
-
-class SDMatteModelLoader:
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "ckpt_name": (folder_paths.get_filename_list("checkpoints"), ),
-            }
-        }
-
-    RETURN_TYPES = ("SDMATTE_MODEL",)
-    FUNCTION = "load_model"
-    CATEGORY = "Matting/SDMatte"
-
-    def load_model(self, ckpt_name):
-        device = comfy.model_management.get_torch_device()
-
-        global SDMatteCore
-        if SDMatteCore is None:
-            from .src.modeling.SDMatte.meta_arch import SDMatte as SDMatteCore  # type: ignore
-
-        # 使用本地固定路径作为 diffusers 基底
-        base_dir = os.path.dirname(__file__)
-        pretrained_repo = os.path.join(base_dir, "src", "SDMatte")
-        required_subdirs = ["text_encoder", "vae", "unet", "scheduler", "tokenizer"]
-        missing = [d for d in required_subdirs if not os.path.isdir(os.path.join(pretrained_repo, d))]
-        if missing:
-            raise FileNotFoundError(
-                f"本地基底缺少目录: {missing}. 期望路径: {pretrained_repo}，需包含 {required_subdirs} 子目录。"
-            )
-
-        print(f"[SDMatte] Using base repo: {pretrained_repo}")
-        # 实例化模型（使用默认优化配置）
-        model = SDMatteCore(
-            pretrained_model_name_or_path=pretrained_repo,
-            load_weight=False,
-            use_aux_input=True,
-            aux_input="trimap",
-            use_encoder_hidden_states=True,
-            use_attention_mask=True,
-            add_noise=False,
-        )
-
-        # 加载合并后的权重
-        ckpt_path = folder_paths.get_full_path("checkpoints", ckpt_name)
-        print(f"[SDMatte] Loading merged weights: {ckpt_path}")
-        # 更健壮的加载与 state_dict 提取
-        state_root = None
-        try:
-            from torch.serialization import add_safe_globals
-            try:
-                from omegaconf.listconfig import ListConfig
-                add_safe_globals([ListConfig])
-            except Exception:
-                pass
-            try:
-                from omegaconf.base import ContainerMetadata
-                add_safe_globals([ContainerMetadata])
-            except Exception:
-                pass
-
-            try:
-                state_root = torch.load(ckpt_path, map_location='cpu', weights_only=True)
-                print("[SDMatte] torch.load(weights_only=True) ok")
-            except Exception as e:
-                print(f"[SDMatte] weights_only=True failed: {e}; retry weights_only=False")
-                try:
-                    state_root = torch.load(ckpt_path, map_location='cpu', weights_only=False)
-                    print("[SDMatte] torch.load(weights_only=False) ok")
-                except TypeError:
-                    state_root = torch.load(ckpt_path, map_location='cpu')
-        except Exception as e:
-            print(f"[SDMatte] torch.load failed: {e}; fallback comfy.load_torch_file")
-            state_root = load_torch_file(ckpt_path)
-
-        # 尝试从常见键中提取真正权重
-        candidate_keys = [
-            'state_dict','model_state_dict','params','weights',
-            'ema','model_ema','ema_state_dict','net','module','model','unet'
-        ]
-        state_dict = None
-        if isinstance(state_root, dict):
-            for k in candidate_keys:
-                inner = state_root.get(k)
-                if isinstance(inner, dict) and len(inner) > 50:
-                    state_dict = inner
-                    print(f"[SDMatte] extracted inner dict via key: {k}")
-                    break
-        if state_dict is None and isinstance(state_root, dict):
-            # 如果顶层就是大量权重键
-            if len(state_root) > 50 and any('.weight' in x or '.bias' in x for x in state_root.keys()):
-                state_dict = state_root
-        if state_dict is None:
-            top_keys = list(state_root.keys()) if isinstance(state_root, dict) else []
-            raise RuntimeError(
-                f"无法从权重中提取 state_dict。顶层键: {top_keys[:10]} (共{len(top_keys)})。请使用官方脚本导出仅模型权重的 sdmatte.pth。"
-            )
-
-        print(f"[SDMatte] Weights loaded, keys: {len(list(state_dict.keys()))}")
-        missing, unexpected = model.load_state_dict(state_dict, strict=False)
-        print(f"[SDMatte] load_state_dict done. missing={len(missing)}, unexpected={len(unexpected)}")
-
-        model.eval()
-        model.to(device)
-
-        return (model,)
 
 
 def _resize_norm_image_bchw(image_bchw: torch.Tensor, size_hw=(1024, 1024)) -> torch.Tensor:
@@ -140,7 +100,7 @@ class SDMatteApply:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "sdmatte_model": ("SDMATTE_MODEL", {"tooltip": "已加载的SDMatte模型，来自SDMatte Model Loader节点"}),
+                "ckpt_name": (list(MODEL_URLS.keys()), ),
                 "image": ("IMAGE", {"tooltip": "需要进行抠图的输入图像"}),
                 "trimap": ("MASK", {"tooltip": "三值图掩码：白色=前景，黑色=背景，灰色=未知区域"}),
                 "inference_size": ([512, 640, 768, 896, 1024], {
@@ -177,10 +137,78 @@ class SDMatteApply:
     FUNCTION = "apply_matte"
     CATEGORY = "Matting/SDMatte"
 
-    def apply_matte(self, sdmatte_model, image, trimap, inference_size, is_transparent, output_mode, mask_refine, trimap_constraint, force_cpu=False):
+    def apply_matte(self, ckpt_name, image, trimap, inference_size, is_transparent, output_mode, mask_refine, trimap_constraint, force_cpu=False):
         device = comfy.model_management.get_torch_device()
         if force_cpu:
             device = torch.device('cpu')
+
+        # Load model
+        global SDMatteCore
+        if SDMatteCore is None:
+            from .src.modeling.SDMatte.meta_arch import SDMatte as SDMatteCore
+
+        base_dir = os.path.dirname(__file__)
+        pretrained_repo = os.path.join(base_dir, "src", "SDMatte")
+        required_subdirs = ["text_encoder", "vae", "unet", "scheduler", "tokenizer"]
+        missing = [d for d in required_subdirs if not os.path.isdir(os.path.join(pretrained_repo, d))]
+        if missing:
+            raise FileNotFoundError(
+                f"本地基底缺少目录: {missing}. 期望路径: {pretrained_repo}，需包含 {required_subdirs} 子目录。"
+            )
+        
+        sdmatte_model = SDMatteCore(
+            pretrained_model_name_or_path=pretrained_repo,
+            load_weight=False,
+            use_aux_input=True,
+            aux_input="trimap",
+            use_encoder_hidden_states=True,
+            use_attention_mask=True,
+            add_noise=False,
+        )
+        
+        ckpt_path = download_model(ckpt_name)
+        
+        # 更健壮的加载与 state_dict 提取
+        state_root = None
+        try:
+            from torch.serialization import add_safe_globals
+            try:
+                from omegaconf.listconfig import ListConfig
+                add_safe_globals([ListConfig])
+            except Exception:
+                pass
+            try:
+                from omegaconf.base import ContainerMetadata
+                add_safe_globals([ContainerMetadata])
+            except Exception:
+                pass
+
+            try:
+                state_root = torch.load(ckpt_path, map_location='cpu', weights_only=True)
+            except Exception:
+                try:
+                    state_root = torch.load(ckpt_path, map_location='cpu', weights_only=False)
+                except TypeError:
+                    state_root = torch.load(ckpt_path, map_location='cpu')
+        except Exception:
+            state_root = load_torch_file(ckpt_path)
+
+        candidate_keys = [
+            'state_dict','model_state_dict','params','weights',
+            'ema','model_ema','ema_state_dict','net','module','model','unet'
+        ]
+        state_dict = None
+        if isinstance(state_root, dict):
+            for k in candidate_keys:
+                inner = state_root.get(k)
+                if isinstance(inner, dict):
+                    state_dict = inner
+                    break
+        if state_dict is None:
+            state_dict = state_root
+
+        sdmatte_model.load_state_dict(state_dict, strict=False)
+        sdmatte_model.eval()
         sdmatte_model.to(device)
 
         # 自动显存优化（内置默认设置）
@@ -299,12 +327,10 @@ class SDMatteApply:
 
 
 NODE_CLASS_MAPPINGS = {
-    "SDMatteModelLoader": SDMatteModelLoader,
     "SDMatteApply": SDMatteApply,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "SDMatteModelLoader": "Load SDMatte Model",
     "SDMatteApply": "Apply SDMatte",
 }
 
