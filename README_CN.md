@@ -41,6 +41,7 @@ SDMatte 是一个基于稳定扩散（Stable Diffusion）的交互式图像抠�
 - 🖼️ **Trimap 引导**：支持三值图（trimap）引导的精确抠图
 - 🚀 **VRAM 优化**：内置混合精度、注意力切片等多种显存优化策略
 - 🔧 **ComfyUI 集成**：完全兼容 ComfyUI 工作流系统
+- 📥 **模型自动下载**：首次使用时自动下载模型权重
 - 📱 **灵活尺寸**：支持多种推理分辨率（512-1024px）
 
 ## 🛠️ 安装
@@ -63,35 +64,14 @@ ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
 - einops
 - lazyconfig
 
-### 3. 准备模型文件
+### 3. 自动模型下载
 
-#### 下载 SDMatte 权重
+**无需手动下载模型。**
 
-从 [Hugging Face](https://huggingface.co/LongfeiHuang/SDMatte) 下载 SDMatte 模型权重：
+首次使用 `Apply SDMatte` 节点时，它会自动检查并从 Hugging Face 下载所需的模型权重。模型将被存放在：
+`ComfyUI/models/SDMatte/`
 
-**标准版本（SDMatte）：**
-```bash
-# 下载标准版本权重文件
-wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte.pth
-```
-
-**增强版本（SDMatte+）：**
-```bash
-# 下载增强版本权重文件（更高精度，更大模型）
-wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth
-```
-
-将下载的权重文件放置到 ComfyUI 的 checkpoints 目录：
-
-```
-ComfyUI/models/checkpoints/
-├── SDMatte.pth          # 标准版本
-└── SDMatte_plus.pth     # 增强版本
-```
-
-**模型选择建议：**
-- **SDMatte.pth**：标准版本，平衡性能和质量，推荐日常使用
-- **SDMatte_plus.pth**：增强版本，更高精度但需要更多显存和计算时间，适合高质量需求
+您可以直接在节点内选择使用标准版 (`SDMatte.pth`) 或增强版 (`SDMatte_plus.pth`)。
 
 ### 4. 重启 ComfyUI
 
@@ -101,26 +81,22 @@ ComfyUI/models/checkpoints/
 
 ### 节点说明
 
-#### SDMatte Model Loader（SDMatte 模型加载器）
+#### Apply SDMatte（SDMatte 应用）
 
-- **功能**：加载 SDMatte 模型
+- **功能**：在一个节点内完成模型加载和抠图应用。
 - **输入**：
-  - `ckpt_name`：选择 checkpoints 目录中的 SDMatte.pth 文件
-- **输出**：
-  - `SDMATTE_MODEL`：加载好的 SDMatte 模型
-
-#### SDMatte Apply（SDMatte 应用）
-
-- **功能**：使用 SDMatte 模型进行抠图
-- **输入**：
-  - `sdmatte_model`：来自模型加载器的 SDMatte 模型
+  - `ckpt_name`：选择要使用的模型（`SDMatte.pth` 或 `SDMatte_plus.pth`）。如果本地不存在，将自动下载。
   - `image`：输入图像（ComfyUI IMAGE 格式）
   - `trimap`：三值图掩码（ComfyUI MASK 格式）
   - `inference_size`：推理分辨率（512/640/768/896/1024）
   - `is_transparent`：图像是否包含透明区域
+  - `output_mode`：输出模式（`alpha_only`, `matted_rgba`, `matted_rgb`）
+  - `mask_refine`：启用遮罩优化以减少背景干扰
+  - `trimap_constraint`：用于优化的三值图约束强度
   - `force_cpu`：强制使用 CPU 推理（可选）
 - **输出**：
-  - `MASK`：抠图结果的 alpha 遮罩
+  - `alpha_mask`：抠图结果的 alpha 遮罩
+  - `matted_image`：抠图后的图像结果
 
 ### 基础工作流
 
@@ -129,9 +105,8 @@ ComfyUI/models/checkpoints/
    - 黑色（0）：确定背景
    - 白色（1）：确定前景  
    - 灰色（0.5）：未知区域
-3. **SDMatte Model Loader**：加载 SDMatte 模型
-4. **SDMatte Apply**：应用抠图
-5. **Preview Image**：预览抠图结果
+3. **Apply SDMatte**：应用抠图
+4. **Preview Image**：预览抠图结果
 
 ### 推荐设置
 
@@ -195,6 +170,13 @@ A:
 - **依赖**：diffusers, timm, einops, lazyconfig
 
 ## 📝 版本更新日志
+
+### v1.3.0 (2025-08-17)
+- ✨ **新增功能**：
+  - 实现模型自动下载与检查功能，模型现在存放于 `ComfyUI/models/SDMatte/` 目录。
+- 🔧 **优化改进**：
+  - 将 `SDMatte Model Loader` 和 `SDMatte Apply` 节点合并为单一的 `Apply SDMatte` 节点，简化了工作流。
+  - 重构了部分代码，提升稳定性。
 
 ### v1.2.0 (2025-08-15)
 - ✨ **新增功能**：

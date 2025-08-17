@@ -41,6 +41,7 @@ This plugin integrates SDMatte into ComfyUI, providing a simple and easy-to-use 
 - 🖼️ **Trimap Guidance**: Supports trimap-guided precise matting
 - 🚀 **VRAM Optimization**: Built-in mixed precision, attention slicing, and other memory optimization strategies
 - 🔧 **ComfyUI Integration**: Fully compatible with ComfyUI workflow system
+- 📥 **Automatic Model Download**: Automatically downloads model weights on first use
 - 📱 **Flexible Sizes**: Supports multiple inference resolutions (512-1024px)
 
 ## 🛠️ Installation
@@ -63,35 +64,14 @@ ComfyUI will automatically install the dependencies in `requirements.txt` on sta
 - einops
 - lazyconfig
 
-### 3. Prepare Model Files
+### 3. Automatic Model Download
 
-#### Download SDMatte Weights
+**No manual download is required.**
 
-Download SDMatte model weights from [Hugging Face](https://huggingface.co/LongfeiHuang/SDMatte):
+The first time you use the `Apply SDMatte` node, it will automatically check for and download the necessary model weights from Hugging Face. The models will be stored in:
+`ComfyUI/models/SDMatte/`
 
-**Standard Version (SDMatte):**
-```bash
-# Download standard version weight file
-wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte.pth
-```
-
-**Enhanced Version (SDMatte+):**
-```bash
-# Download enhanced version weight file (higher accuracy, larger model)
-wget https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth
-```
-
-Place the downloaded weight files in ComfyUI's checkpoints directory:
-
-```
-ComfyUI/models/checkpoints/
-├── SDMatte.pth          # Standard version
-└── SDMatte_plus.pth     # Enhanced version
-```
-
-**Model Selection Guide:**
-- **SDMatte.pth**: Standard version, balanced performance and quality, recommended for daily use
-- **SDMatte_plus.pth**: Enhanced version, higher accuracy but requires more VRAM and computation time, suitable for high-quality demands
+You can select between the standard (`SDMatte.pth`) and enhanced (`SDMatte_plus.pth`) versions directly within the node.
 
 ### 4. Restart ComfyUI
 
@@ -101,26 +81,22 @@ Restart ComfyUI to load the new custom nodes.
 
 ### Node Description
 
-#### SDMatte Model Loader
+#### Apply SDMatte
 
-- **Function**: Load SDMatte model
+- **Function**: Loads the model and applies it for matting in a single node.
 - **Input**:
-  - `ckpt_name`: Select SDMatte.pth file from checkpoints directory
-- **Output**:
-  - `SDMATTE_MODEL`: Loaded SDMatte model
-
-#### SDMatte Apply
-
-- **Function**: Apply SDMatte model for matting
-- **Input**:
-  - `sdmatte_model`: SDMatte model from model loader
+  - `ckpt_name`: Select the model to use (`SDMatte.pth` or `SDMatte_plus.pth`). It will be downloaded automatically if not found.
   - `image`: Input image (ComfyUI IMAGE format)
   - `trimap`: Trimap mask (ComfyUI MASK format)
   - `inference_size`: Inference resolution (512/640/768/896/1024)
   - `is_transparent`: Whether the image contains transparent areas
+  - `output_mode`: Output mode (`alpha_only`, `matted_rgba`, `matted_rgb`)
+  - `mask_refine`: Enable mask refinement to reduce background interference
+  - `trimap_constraint`: Strength of the trimap constraint for refinement
   - `force_cpu`: Force CPU inference (optional)
 - **Output**:
-  - `MASK`: Alpha mask of matting result
+  - `alpha_mask`: Alpha mask of the matting result
+  - `matted_image`: The matted image result
 
 ### Basic Workflow
 
@@ -129,9 +105,8 @@ Restart ComfyUI to load the new custom nodes.
    - Black (0): Definite background
    - White (1): Definite foreground  
    - Gray (0.5): Unknown region
-3. **SDMatte Model Loader**: Load SDMatte model
-4. **SDMatte Apply**: Apply matting
-5. **Preview Image**: Preview matting result
+3. **Apply SDMatte**: Apply matting
+4. **Preview Image**: Preview matting result
 
 ### Recommended Settings
 
@@ -195,6 +170,13 @@ A:
 - **Dependencies**: diffusers, timm, einops, lazyconfig
 
 ## 📝 Changelog
+
+### v1.3.0 (2025-08-17)
+- ✨ **New Features**:
+  - Implemented automatic model downloading and checking. Models are now stored in `ComfyUI/models/SDMatte/`.
+- 🔧 **Improvements**:
+  - Merged `SDMatte Model Loader` and `SDMatte Apply` nodes into a single `Apply SDMatte` node for a more streamlined workflow.
+  - Refactored code for better stability.
 
 ### v1.2.0 (2025-08-15)
 - ✨ **New Features**:
