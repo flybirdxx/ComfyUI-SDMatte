@@ -63,6 +63,7 @@ ComfyUI will automatically install the dependencies in `requirements.txt` on sta
 - timm
 - einops
 - lazyconfig
+- safetensors
 
 ### 3. Automatic Model Download
 
@@ -71,7 +72,7 @@ ComfyUI will automatically install the dependencies in `requirements.txt` on sta
 The first time you use the `Apply SDMatte` node, it will automatically check for and download the necessary model weights from Hugging Face. The models will be stored in:
 `ComfyUI/models/SDMatte/`
 
-You can select between the standard (`SDMatte.pth`) and enhanced (`SDMatte_plus.pth`) versions directly within the node.
+You can select between the standard (`SDMatte.safetensors`) and enhanced (`SDMatte_plus.safetensors`) versions directly within the node.
 
 ### 4. Restart ComfyUI
 
@@ -85,7 +86,7 @@ Restart ComfyUI to load the new custom nodes.
 
 - **Function**: Loads the model and applies it for matting in a single node.
 - **Input**:
-  - `ckpt_name`: Select the model to use (`SDMatte.pth` or `SDMatte_plus.pth`). It will be downloaded automatically if not found.
+  - `ckpt_name`: Select the model to use (`SDMatte.safetensors` or `SDMatte_plus.safetensors`). It will be downloaded automatically if not found.
   - `image`: Input image (ComfyUI IMAGE format)
   - `trimap`: Trimap mask (ComfyUI MASK format)
   - `inference_size`: Inference resolution (512/640/768/896/1024)
@@ -144,7 +145,7 @@ The plugin has built-in memory optimization strategies (automatically enabled):
 A: Ensure the plugin directory structure is correct, restart ComfyUI, check console for error messages.
 
 ### Q: Model loading failed?
-A: Check SDMatte.pth file path, ensure base model directory structure is complete, view console for detailed error messages.
+A: Check SDMatte.safetensors file path, ensure base model directory structure is complete, view console for detailed error messages.
 
 ### Q: Insufficient VRAM during inference?
 A: Try reducing inference resolution, enable `force_cpu` option, or close other VRAM-consuming programs.
@@ -157,8 +158,8 @@ A: First run needs to compile CUDA kernels, subsequent inference will be signifi
 
 ### Q: Which model version should I choose?
 A: 
-- **SDMatte.pth (Standard)**: Smaller file (~11GB), faster inference, suitable for most scenarios
-- **SDMatte_plus.pth (Enhanced)**: Larger file, higher accuracy, suitable for professional use with extremely high quality requirements
+- **SDMatte.safetensors (Standard)**: Smaller file (~11GB), faster inference, suitable for most scenarios
+- **SDMatte_plus.safetensors (Enhanced)**: Larger file, higher accuracy, suitable for professional use with extremely high quality requirements
 - Recommend testing with standard version first, upgrade to enhanced version if higher quality is needed
 
 ## 📋 System Requirements
@@ -167,9 +168,22 @@ A:
 - **Python**: 3.8+
 - **PyTorch**: 1.12+ (CUDA support recommended)
 - **VRAM**: 8GB+ recommended (CPU inference supported)
-- **Dependencies**: diffusers, timm, einops, lazyconfig
+- **Dependencies**: diffusers, timm, einops, lazyconfig, safetensors
 
 ## 📝 Changelog
+
+### v1.5.0 (2025-01-XX)
+- 🔄 **Model Format Update**:
+  - Migrated from `.pth` to `.safetensors` format for better security and performance
+  - Updated model download URLs to use Hugging Face repository (1038lab/SDMatte)
+  - Improved model loading with SafeTensors library for safer weight handling
+- 🔧 **Technical Improvements**:
+  - Enhanced model loading stability with better error handling
+  - Optimized memory usage during model loading process
+  - Improved compatibility with latest ComfyUI versions
+- 📚 **Documentation Updates**:
+  - Updated installation instructions to reflect new model format
+  - Added information about SafeTensors format benefits
 
 ### v1.3.0 (2025-08-17)
 - ✨ **New Features**:

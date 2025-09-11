@@ -1,21 +1,16 @@
 import os
 import torch
-import torch.nn.functional as F
-import numpy as np
 from torchvision import transforms
 
 import folder_paths
 import comfy
-from comfy.utils import load_torch_file
 
-
-# SDMatte Model Downloader
-# Correctly get the 'models' directory by finding the parent of the checkpoints directory
-models_dir = os.path.dirname(folder_paths.get_folder_paths("checkpoints")[0])
+# Get the models directory from ComfyUI
+models_dir = folder_paths.models_dir
 MODEL_DIR = os.path.join(models_dir, "SDMatte")
 MODEL_URLS = {
-    "SDMatte.pth": "https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte.pth",
-    "SDMatte_plus.pth": "https://huggingface.co/LongfeiHuang/SDMatte/resolve/main/SDMatte_plus.pth"
+    "SDMatte.safetensors": "https://huggingface.co/1038lab/SDMatte/resolve/main/SDMatte.safetensors",
+    "SDMatte_plus.safetensors": "https://huggingface.co/1038lab/SDMatte/resolve/main/SDMatte_plus.safetensors"
 }
 os.makedirs(MODEL_DIR, exist_ok=True)
 
@@ -58,7 +53,6 @@ def download_model(model_name, models_dir=MODEL_DIR, model_urls=MODEL_URLS):
         return target_path
 
     except (ImportError, ModuleNotFoundError):
-        print("[SDMatte] Warning: 'requests' and 'tqdm' not found. Downloading without progress bar.")
         import urllib.request
         try:
             urllib.request.urlretrieve(url, tmp_path)
@@ -66,22 +60,18 @@ def download_model(model_name, models_dir=MODEL_DIR, model_urls=MODEL_URLS):
             print(f"[SDMatte] Download complete: {target_path}")
             return target_path
         except Exception as e_url:
-            print(f"[SDMatte] Error downloading with urllib: {e_url}")
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
             raise
     except Exception as e:
-        print(f"[SDMatte] Error downloading model: {e}")
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
         raise
 
-# 延迟导入核心模型，避免在依赖未安装时阻断节点注册
 SDMatteCore = None
 
 
 def _resize_norm_image_bchw(image_bchw: torch.Tensor, size_hw=(1024, 1024)) -> torch.Tensor:
-    # image_bchw in [0,1], float32
     resize = transforms.Resize(size_hw, antialias=True)
     norm = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     x = resize(image_bchw)
@@ -125,10 +115,7 @@ class SDMatteApply:
                 }),
             },
             "optional": {
-                "force_cpu": ("BOOLEAN", {
-                    "default": False, 
-                    "tooltip": "强制使用CPU推理。仅在GPU显存不足时启用，会显著降低速度"
-                }),
+                "force_cpu": ("BOOLEAN", {"default": False}),
             },
         }
 
@@ -142,7 +129,6 @@ class SDMatteApply:
         if force_cpu:
             device = torch.device('cpu')
 
-        # Load model
         global SDMatteCore
         if SDMatteCore is None:
             from .src.modeling.SDMatte.meta_arch import SDMatte as SDMatteCore
@@ -152,9 +138,7 @@ class SDMatteApply:
         required_subdirs = ["text_encoder", "vae", "unet", "scheduler", "tokenizer"]
         missing = [d for d in required_subdirs if not os.path.isdir(os.path.join(pretrained_repo, d))]
         if missing:
-            raise FileNotFoundError(
-                f"本地基底缺少目录: {missing}. 期望路径: {pretrained_repo}，需包含 {required_subdirs} 子目录。"
-            )
+            raise FileNotFoundError(f"Missing directories: {missing}. Expected path: {pretrained_repo}")
         
         sdmatte_model = SDMatteCore(
             pretrained_model_name_or_path=pretrained_repo,
@@ -170,30 +154,12 @@ class SDMatteApply:
         
         ckpt_path = download_model(ckpt_name)
         
-        # 更健壮的加载与 state_dict 提取
-        state_root = None
-        try:
-            from torch.serialization import add_safe_globals
-            try:
-                from omegaconf.listconfig import ListConfig
-                add_safe_globals([ListConfig])
-            except Exception:
-                pass
-            try:
-                from omegaconf.base import ContainerMetadata
-                add_safe_globals([ContainerMetadata])
-            except Exception:
-                pass
-
-            try:
-                state_root = torch.load(ckpt_path, map_location='cpu', weights_only=True)
-            except Exception:
-                try:
-                    state_root = torch.load(ckpt_path, map_location='cpu', weights_only=False)
-                except TypeError:
-                    state_root = torch.load(ckpt_path, map_location='cpu')
-        except Exception:
-            state_root = load_torch_file(ckpt_path)
+        from safetensors import safe_open
+        state_dict = {}
+        with safe_open(ckpt_path, framework="pt", device="cpu") as f:
+            for key in f.keys():
+                state_dict[key] = f.get_tensor(key)
+        state_root = state_dict
 
         candidate_keys = [
             'state_dict','model_state_dict','params','weights',
@@ -213,40 +179,32 @@ class SDMatteApply:
         sdmatte_model.eval()
         sdmatte_model.to(device)
 
-        # 自动显存优化（内置默认设置）
         if device.type == 'cuda':
             try:
-                torch.cuda.empty_cache()  # 预清理显存
+                torch.cuda.empty_cache()
             except Exception:
                 pass
             
-            # 启用注意力切片以节省显存
             try:
                 unet = getattr(sdmatte_model, 'unet', None)
                 if unet is not None and hasattr(unet, 'set_attn_processor'):
                     from diffusers.models.attention_processor import SlicedAttnProcessor
-                    # 使用适中的切片大小平衡性能和显存
                     unet.set_attn_processor(SlicedAttnProcessor(slice_size=1))
-            except Exception as e:
-                print(f'[SDMatte] 注意力优化跳过: {e}')
+            except Exception:
+                pass
 
         B, H, W, C = image.shape
         orig_h, orig_w = H, W
 
-        # IMAGE: (B,H,W,C)->(B,C,H,W) in [0,1]
         img_bchw = image.permute(0, 3, 1, 2).contiguous().to(device)
         img_in = _resize_norm_image_bchw(img_bchw, (int(inference_size), int(inference_size)))
 
-        # 构造必要的数据字典字段
         is_trans = torch.tensor([1 if is_transparent else 0] * B, device=device)
-
         data = {"image": img_in, "is_trans": is_trans, "caption": [""] * B}
 
         def to_b1hw(x):
             return _resize_mask_b1hw(x.unsqueeze(1).contiguous().to(device), (int(inference_size), int(inference_size)))
 
-        # 处理 trimap 输入
-        # 将[0,1]范围的trimap转换为[-1,1]范围，与训练时保持一致
         tri = to_b1hw(trimap) * 2 - 1
         data["trimap"] = tri
         data["trimap_coords"] = torch.tensor([[0,0,1,1]]*B, dtype=tri.dtype, device=device)
@@ -258,68 +216,43 @@ class SDMatteApply:
             else:
                 pred_alpha = sdmatte_model(data)
 
-        # 还原到原尺寸
         out = transforms.Resize((orig_h, orig_w))(pred_alpha)
         out = out.squeeze(1).clamp(0, 1).detach().cpu()
         
-        # 遮罩优化：使用trimap约束来过滤不需要的区域
         if mask_refine:
-            trimap_cpu = trimap.cpu()  # (B, H, W)
+            trimap_cpu = trimap.cpu()
             
-            # 创建严格的前景约束
-            # 只在trimap明确标记为前景(白色区域)的地方保留高alpha值
-            # 在未知区域(灰色)允许模型输出，但在背景区域(黑色)强制为0
-            foreground_regions = trimap_cpu > trimap_constraint  # 前景区域
-            background_regions = trimap_cpu < (1.0 - trimap_constraint)  # 背景区域
-            unknown_regions = ~(foreground_regions | background_regions)  # 未知区域
+            foreground_regions = trimap_cpu > trimap_constraint
+            background_regions = trimap_cpu < (1.0 - trimap_constraint)
+            unknown_regions = ~(foreground_regions | background_regions)
             
-            # 优化alpha遮罩
             refined_alpha = out.clone()
-            
-            # 背景区域强制为0
             refined_alpha[background_regions] = 0.0
-            
-            # 前景区域保持原值或增强
             refined_alpha[foreground_regions] = torch.clamp(refined_alpha[foreground_regions] * 1.2, 0, 1)
             
-            # 未知区域保持模型输出，但应用阈值过滤
-            alpha_threshold = 0.3  # 过滤掉低置信度的区域
+            alpha_threshold = 0.3
             low_confidence = (refined_alpha < alpha_threshold) & unknown_regions
             refined_alpha[low_confidence] = 0.0
             
             out = refined_alpha
         
-        # 根据输出模式创建不同的抠图结果
-        # out: (B, H, W), image: (B, H, W, C)
-        alpha_expanded = out.unsqueeze(-1)  # (B, H, W, 1)
+        alpha_expanded = out.unsqueeze(-1)
         
         if output_mode == "alpha_only":
-            # 只输出alpha遮罩，图像输出为黑色
             matted_image = torch.zeros_like(image.cpu())
         elif output_mode == "matted_rgba":
-            # 创建RGBA图像：RGB通道保持原图，A通道为alpha遮罩
-            # 背景变为透明，只保留前景对象
             matted_image = torch.cat([
-                image.cpu(),  # RGB通道保持原图
-                alpha_expanded.expand(-1, -1, -1, 1)  # A通道为遮罩本身
+                image.cpu(),
+                alpha_expanded.expand(-1, -1, -1, 1)
             ], dim=-1)
-            # RGBA模式输出4通道图像，保持透明背景
-            # 注意：ComfyUI可能不支持4通道显示，但数据格式正确
         elif output_mode == "matted_rgb":
-            # 只保留前景对象，背景变为黑色
-            # 使用trimap的前景信息来更精确地提取对象
-            trimap_cpu = trimap.cpu()  # (B, H, W)
-            trimap_expanded = trimap_cpu.unsqueeze(-1)  # (B, H, W, 1)
-            
-            # 只在trimap标记为前景(>0.8)或未知区域(0.2-0.8)的地方保留原图
-            # 结合alpha遮罩进一步细化
+            trimap_cpu = trimap.cpu()
+            trimap_expanded = trimap_cpu.unsqueeze(-1)
             foreground_mask = (trimap_expanded > 0.2) & (alpha_expanded > 0.1)
             matted_image = image.cpu() * foreground_mask.float()
         else:
-            # 默认：直接应用alpha遮罩
             matted_image = image.cpu() * alpha_expanded
         
-        # 推理后清理显存
         if device.type == 'cuda':
             try:
                 torch.cuda.empty_cache()

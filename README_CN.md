@@ -63,6 +63,7 @@ ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
 - timm
 - einops
 - lazyconfig
+- safetensors
 
 ### 3. 自动模型下载
 
@@ -71,7 +72,7 @@ ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
 首次使用 `Apply SDMatte` 节点时，它会自动检查并从 Hugging Face 下载所需的模型权重。模型将被存放在：
 `ComfyUI/models/SDMatte/`
 
-您可以直接在节点内选择使用标准版 (`SDMatte.pth`) 或增强版 (`SDMatte_plus.pth`)。
+您可以直接在节点内选择使用标准版 (`SDMatte.safetensors`) 或增强版 (`SDMatte_plus.safetensors`)。
 
 ### 4. 重启 ComfyUI
 
@@ -85,7 +86,7 @@ ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
 
 - **功能**：在一个节点内完成模型加载和抠图应用。
 - **输入**：
-  - `ckpt_name`：选择要使用的模型（`SDMatte.pth` 或 `SDMatte_plus.pth`）。如果本地不存在，将自动下载。
+  - `ckpt_name`：选择要使用的模型（`SDMatte.safetensors` 或 `SDMatte_plus.safetensors`）。如果本地不存在，将自动下载。
   - `image`：输入图像（ComfyUI IMAGE 格式）
   - `trimap`：三值图掩码（ComfyUI MASK 格式）
   - `inference_size`：推理分辨率（512/640/768/896/1024）
@@ -144,7 +145,7 @@ ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
 A: 确保插件目录结构正确，重启 ComfyUI，检查控制台是否有错误信息。
 
 ### Q: 模型加载失败？
-A: 检查 SDMatte.pth 文件路径，确保基础模型目录结构完整，查看控制台详细错误信息。
+A: 检查 SDMatte.safetensors 文件路径，确保基础模型目录结构完整，查看控制台详细错误信息。
 
 ### Q: 推理时显存不足？
 A: 尝试降低推理分辨率，启用 `force_cpu` 选项，或关闭其他占用显存的程序。
@@ -157,8 +158,8 @@ A: 首次运行需要编译 CUDA 内核，后续推理会显著加速。
 
 ### Q: 应该选择哪个模型版本？
 A: 
-- **SDMatte.pth（标准版）**：文件较小（~11GB），推理速度快，适合大多数场景
-- **SDMatte_plus.pth（增强版）**：文件较大，精度更高，适合对质量要求极高的专业用途
+- **SDMatte.safetensors（标准版）**：文件较小（~11GB），推理速度快，适合大多数场景
+- **SDMatte_plus.safetensors（增强版）**：文件较大，精度更高，适合对质量要求极高的专业用途
 - 建议先使用标准版测试，如需更高质量再升级到增强版
 
 ## 📋 系统要求
@@ -167,9 +168,22 @@ A:
 - **Python**：3.8+
 - **PyTorch**：1.12+ （支持 CUDA 推荐）
 - **显存**：8GB+ 推荐（支持 CPU 推理）
-- **依赖**：diffusers, timm, einops, lazyconfig
+- **依赖**：diffusers, timm, einops, lazyconfig, safetensors
 
 ## 📝 版本更新日志
+
+### v1.5.0 (2025-01-XX)
+- 🔄 **模型格式更新**：
+  - 从 `.pth` 格式迁移到 `.safetensors` 格式，提供更好的安全性和性能
+  - 更新模型下载链接，使用 Hugging Face 仓库 (1038lab/SDMatte)
+  - 使用 SafeTensors 库改进模型加载，提供更安全的权重处理
+- 🔧 **技术改进**：
+  - 增强模型加载稳定性，提供更好的错误处理
+  - 优化模型加载过程中的内存使用
+  - 改进与最新 ComfyUI 版本的兼容性
+- 📚 **文档更新**：
+  - 更新安装说明以反映新的模型格式
+  - 添加 SafeTensors 格式优势的相关信息
 
 ### v1.3.0 (2025-08-17)
 - ✨ **新增功能**：

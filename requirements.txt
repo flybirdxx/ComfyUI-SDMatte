@@ -7,4 +7,5 @@ omegaconf>=2.3.0
 fvcore>=0.1.5.post20221221
 torchvision>=0.16.0
 opencv-python>=4.8.0
+safetensors>=0.4.0
 
