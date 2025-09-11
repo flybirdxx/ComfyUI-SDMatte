@@ -161,6 +161,8 @@ class SDMatteApply:
             load_weight=False,
             use_aux_input=True,
             aux_input="trimap",
+            aux_input_list=["point_mask", "bbox_mask", "mask", "trimap"],
+            attn_mask_aux_input=["point_mask", "bbox_mask", "mask", "trimap"],
             use_encoder_hidden_states=True,
             use_attention_mask=True,
             add_noise=False,
@@ -244,6 +246,7 @@ class SDMatteApply:
             return _resize_mask_b1hw(x.unsqueeze(1).contiguous().to(device), (int(inference_size), int(inference_size)))
 
         # 处理 trimap 输入
+        # 将[0,1]范围的trimap转换为[-1,1]范围，与训练时保持一致
         tri = to_b1hw(trimap) * 2 - 1
         data["trimap"] = tri
         data["trimap_coords"] = torch.tensor([[0,0,1,1]]*B, dtype=tri.dtype, device=device)
@@ -297,11 +300,11 @@ class SDMatteApply:
             # 创建RGBA图像：RGB通道保持原图，A通道为alpha遮罩
             # 背景变为透明，只保留前景对象
             matted_image = torch.cat([
-                image.cpu() * alpha_expanded,  # RGB通道应用遮罩
+                image.cpu(),  # RGB通道保持原图
                 alpha_expanded.expand(-1, -1, -1, 1)  # A通道为遮罩本身
             ], dim=-1)
-            # 确保输出仍为3通道（ComfyUI IMAGE格式）
-            matted_image = matted_image[..., :3]
+            # RGBA模式输出4通道图像，保持透明背景
+            # 注意：ComfyUI可能不支持4通道显示，但数据格式正确
         elif output_mode == "matted_rgb":
             # 只保留前景对象，背景变为黑色
             # 使用trimap的前景信息来更精确地提取对象
