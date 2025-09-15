@@ -6,66 +6,109 @@ import folder_paths
 import comfy
 
 # Get the models directory from ComfyUI
-models_dir = folder_paths.models_dir
-MODEL_DIR = os.path.join(models_dir, "SDMatte")
+MODEL_DIR = os.path.join(folder_paths.models_dir, "SDMatte")
+
 MODEL_URLS = {
     "SDMatte.safetensors": "https://huggingface.co/1038lab/SDMatte/resolve/main/SDMatte.safetensors",
     "SDMatte_plus.safetensors": "https://huggingface.co/1038lab/SDMatte/resolve/main/SDMatte_plus.safetensors"
 }
-os.makedirs(MODEL_DIR, exist_ok=True)
 
 def download_model(model_name, models_dir=MODEL_DIR, model_urls=MODEL_URLS):
+    # 1) Search in all registered SDMatte paths first
+    all_search_paths = folder_paths.get_folder_paths("SDMatte") or []
+    for search_path in all_search_paths:
+        check_path = os.path.join(search_path, model_name)
+        if os.path.isfile(check_path):
+            try:
+                if os.path.getsize(check_path) > 0:
+                    print(f"[SDMatte] Found model at: {check_path}")
+                    return check_path
+            except OSError:
+                pass  # couldn't stat; continue
+
+    # 2) Not found -> prepare to download to models_dir
     url = model_urls.get(model_name)
     if not url:
         raise ValueError(f"[SDMatte] Unknown model name: {model_name}")
 
     target_path = os.path.join(models_dir, model_name)
-    
-    if os.path.exists(target_path) and os.path.getsize(target_path) > 0:
-        return target_path
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
-    print(f"[SDMatte] Model '{model_name}' not found. Downloading...")
-    
+    # if target exists and non-empty, use it
+    if os.path.isfile(target_path):
+        try:
+            if os.path.getsize(target_path) > 0:
+                return target_path
+        except OSError:
+            pass
+
+    print(f"[SDMatte] Model '{model_name}' not found. Downloading to {target_path}...")
+
     tmp_path = target_path + ".tmp"
 
     try:
-        import requests
-        from tqdm import tqdm
+        try:
+            import requests
+            try:
+                from tqdm import tqdm  # optional
+            except Exception:
+                tqdm = None
 
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-        total_size = int(response.headers.get('content-length', 0))
-        
-        with open(tmp_path, 'wb') as f, tqdm(
-            desc=model_name,
-            total=total_size,
-            unit='iB',
-            unit_scale=True,
-            unit_divisor=1024,
-        ) as bar:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    size = f.write(chunk)
-                    bar.update(size)
-        
-        os.rename(tmp_path, target_path)
+            with requests.get(url, stream=True, timeout=60) as response:
+                response.raise_for_status()
+                total_size = int(response.headers.get('content-length', 0) or 0)
+
+                with open(tmp_path, 'wb') as f:
+                    bar = None
+                    if tqdm and total_size > 0:
+                        bar = tqdm(desc=model_name, total=total_size, unit='iB', unit_scale=True, unit_divisor=1024)
+
+                    for chunk in response.iter_content(chunk_size=1024*1024):
+                        if chunk:
+                            f.write(chunk)
+                            if bar:
+                                bar.update(len(chunk))
+
+                    if bar:
+                        bar.close()
+
+            # optional size check
+            if total_size > 0:
+                try:
+                    if os.path.getsize(tmp_path) != total_size:
+                        raise IOError(f"[SDMatte] Incomplete download: {os.path.getsize(tmp_path)} != {total_size}")
+                except OSError:
+                    raise
+
+        except (ImportError, ModuleNotFoundError):
+            import urllib.request
+            urllib.request.urlretrieve(url, tmp_path)
+
+        # concurrent safety: if another process already finished
+        if os.path.isfile(target_path) and os.path.getsize(target_path) > 0:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            return target_path
+
+        os.replace(tmp_path, target_path)  # atomic
         print(f"[SDMatte] Download complete: {target_path}")
         return target_path
 
-    except (ImportError, ModuleNotFoundError):
-        import urllib.request
-        try:
-            urllib.request.urlretrieve(url, tmp_path)
-            os.rename(tmp_path, target_path)
-            print(f"[SDMatte] Download complete: {target_path}")
-            return target_path
-        except Exception as e_url:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            raise
-    except Exception as e:
+    except KeyboardInterrupt:
         if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        raise
+    except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
         raise
 
 SDMatteCore = None
