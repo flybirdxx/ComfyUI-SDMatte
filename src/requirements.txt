@@ -1,0 +1,16 @@
+torch==2.2.0
+torchvision==0.17.0
+tensorboard
+timm==0.5.4
+opencv-python==4.5.4.60
+setuptools==58.2.0
+easydict
+scikit-image==0.24.0
+fairscale==0.4.13
+diffusers==0.30.3
+transformers==4.45.1
+numpy==1.24.1
+Pillow==9.2.0
+huggingface-hub==0.25.1
+accelerate==0.34.2
+cached_property==2.0.1

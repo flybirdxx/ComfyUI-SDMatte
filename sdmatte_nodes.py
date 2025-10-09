@@ -8,6 +8,9 @@ import comfy
 # Get the models directory from ComfyUI
 MODEL_DIR = os.path.join(folder_paths.models_dir, "SDMatte")
 
+# Register the SDMatte folder path with ComfyUI
+folder_paths.add_model_folder_path("SDMatte", MODEL_DIR)
+
 MODEL_URLS = {
     "SDMatte.safetensors": "https://huggingface.co/1038lab/SDMatte/resolve/main/SDMatte.safetensors",
     "SDMatte_plus.safetensors": "https://huggingface.co/1038lab/SDMatte/resolve/main/SDMatte_plus.safetensors"
