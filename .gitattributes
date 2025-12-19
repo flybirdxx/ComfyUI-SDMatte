@@ -1,0 +1,18 @@
+# Set default behavior to automatically normalize line endings.
+* text=auto
+
+# Force UTF-8 encoding for JSON files
+*.json text eol=lf encoding=utf-8
+
+# Force UTF-8 encoding for workflow files
+example_workflow/*.json text eol=lf encoding=utf-8
+
+# Python files
+*.py text eol=lf encoding=utf-8
+
+# Markdown files
+*.md text eol=lf encoding=utf-8
+
+# Text files
+*.txt text eol=lf encoding=utf-8
+
