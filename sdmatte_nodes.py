@@ -180,7 +180,7 @@ class SDMatteApply:
             from .src.modeling.SDMatte.meta_arch import SDMatte as SDMatteCore
 
         base_dir = os.path.dirname(__file__)
-        pretrained_repo = os.path.join(base_dir, "src", "SDMatte")
+        pretrained_repo = os.path.join(base_dir, "src", "stable-diffusion-2.1")
         required_subdirs = ["text_encoder", "vae", "unet", "scheduler", "tokenizer"]
         missing = [d for d in required_subdirs if not os.path.isdir(os.path.join(pretrained_repo, d))]
         if missing:
