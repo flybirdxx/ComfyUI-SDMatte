@@ -65,11 +65,17 @@ ComfyUI will automatically install the dependencies in `requirements.txt` on sta
 - lazyconfig
 - safetensors
 
-### 3. Download Base Model
+### 3. Automatic Component Download
 
-**Stable Diffusion 2.1 base model is required.**
+**The plugin automatically downloads required config files, no manual action needed.**
 
-SDMatte is built on top of Stable Diffusion 2.1. You need to download the base model in ComfyUI's diffusers directory:
+SDMatte is built on top of Stable Diffusion 2.1. On first use, it automatically downloads necessary config files from Hugging Face (no model weights):
+
+- Auto-downloads to: `ComfyUI/models/diffusers/stable-diffusion-2-1-base/`
+- Downloads only config files: config.json, tokenizer files, etc.
+- No large weight files downloaded, saving disk space
+
+If you need to manually download the complete Stable Diffusion 2.1 model:
 
 ```bash
 # Navigate to diffusers directory

@@ -65,11 +65,17 @@ ComfyUI 会在启动时自动安装 `requirements.txt` 中的依赖包：
 - lazyconfig
 - safetensors
 
-### 3. 下载基础模型
+### 3. 自动下载基础组件
 
-**需要下载 Stable Diffusion 2.1 基础模型。**
+**插件会自动下载所需的配置文件，无需手动操作。**
 
-SDMatte 基于 Stable Diffusion 2.1 构建，您需要在 ComfyUI 的 diffusers 目录中下载基础模型：
+SDMatte 基于 Stable Diffusion 2.1 构建，首次使用时会自动从 Hugging Face 下载必要的配置文件（不包含模型权重）：
+
+- 自动下载到: `ComfyUI/models/diffusers/stable-diffusion-2-1-base/`
+- 只下载配置文件: config.json, tokenizer文件等
+- 不下载大文件权重，节省磁盘空间
+
+如果需要手动下载完整的 Stable Diffusion 2.1 模型：
 
 ```bash
 # 进入diffusers目录
