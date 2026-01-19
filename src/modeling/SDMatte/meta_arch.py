@@ -100,8 +100,19 @@ class SDMatte(nn.Module):
             self.vae = AutoencoderKL.from_config(AutoencoderKL.load_config(vae_path))
 
             unet_path = _resolve_nested_dir(pretrained_model_name_or_path, "unet", "config.json")
+            unet_config = CustomUNet.load_config(unet_path)
+
+            # Set default values for SDMatte-specific parameters if not present in config
+            # These values are based on the actual SDMatte model weights
+            if 'point_embeddings_input_dim' not in unet_config:
+                unet_config['point_embeddings_input_dim'] = 1680  # From checkpoint: [1280, 1680]
+            if 'bbox_embeddings_input_dim' not in unet_config:
+                unet_config['bbox_embeddings_input_dim'] = 1280  # After timestep embedding
+            if 'bbox_time_embed_dim' not in unet_config:
+                unet_config['bbox_time_embed_dim'] = 1280  # Match time_embed_dim
+
             self.unet = CustomUNet.from_config(
-                CustomUNet.load_config(unet_path),
+                unet_config,
                 low_cpu_mem_usage=True,
                 ignore_mismatched_sizes=False
             )
@@ -165,9 +176,24 @@ class SDMatte(nn.Module):
             added_cond_kwargs = {"point_coords": coor}
         else:
             if self.use_coor_input:
+                # Process bbox coordinates similar to point coordinates
+                # Use embedding dimension that results in total 1280 dimensions after processing
+                coor = get_timestep_embedding(
+                    coor.flatten(),
+                    320,  # 4 coords * 320 = 1280 total dimensions
+                    flip_sin_to_cos=True,
+                    downscale_freq_shift=0,
+                )
                 added_cond_kwargs = {"bbox_mask_coords": coor}
             else:
-                coor = torch.tensor([[0, 0, 1, 1]] * B).cuda()
+                # Default bbox [0, 0, 1, 1] processed through timestep embedding
+                default_bbox = torch.tensor([[0, 0, 1, 1]] * B).cuda()
+                coor = get_timestep_embedding(
+                    default_bbox.flatten(),
+                    320,  # 4 coords * 320 = 1280 total dimensions
+                    flip_sin_to_cos=True,
+                    downscale_freq_shift=0,
+                )
                 added_cond_kwargs = {"bbox_mask_coords": coor}
 
         # get attention mask

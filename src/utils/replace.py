@@ -449,8 +449,7 @@ class CustomUNet(UNet2DConditionModel):
             coords_embeds = coords_embeds.to(emb.dtype)
             aug_emb = self.point_embedding(coords_embeds)
         elif "bbox_mask_coords" in added_cond_kwargs:
-            coords = added_cond_kwargs.get("bbox_mask_coords")
-            coords_embeds = self.bbox_time_proj(coords.flatten())
+            coords_embeds = added_cond_kwargs.get("bbox_mask_coords")
             coords_embeds = coords_embeds.reshape((sample.shape[0], -1))
             coords_embeds = coords_embeds.to(emb.dtype)
             aug_emb = self.bbox_embedding(coords_embeds)

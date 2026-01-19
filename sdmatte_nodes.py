@@ -179,12 +179,16 @@ class SDMatteApply:
         if SDMatteCore is None:
             from .src.modeling.SDMatte.meta_arch import SDMatte as SDMatteCore
 
-        base_dir = os.path.dirname(__file__)
-        pretrained_repo = os.path.join(base_dir, "src", "stable-diffusion-2.1")
-        required_subdirs = ["text_encoder", "vae", "unet", "scheduler", "tokenizer"]
-        missing = [d for d in required_subdirs if not os.path.isdir(os.path.join(pretrained_repo, d))]
-        if missing:
-            raise FileNotFoundError(f"Missing directories: {missing}. Expected path: {pretrained_repo}")
+        diffusers_paths = folder_paths.get_folder_paths("diffusers") or []
+        pretrained_repo = None
+        for path in diffusers_paths:
+            candidate_path = os.path.join(path, "stable-diffusion-2-1-base")
+            if os.path.isdir(candidate_path):
+                pretrained_repo = candidate_path
+                break
+
+        if pretrained_repo is None:
+            raise FileNotFoundError("Stable Diffusion 2.1 base model not found in diffusers directory. Please download it from https://huggingface.co/stabilityai/stable-diffusion-2-1")
         
         sdmatte_model = SDMatteCore(
             pretrained_model_name_or_path=pretrained_repo,
