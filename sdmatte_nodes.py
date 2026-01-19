@@ -16,6 +16,90 @@ MODEL_URLS = {
     "SDMatte_plus.safetensors": "https://huggingface.co/1038lab/SDMatte/resolve/main/SDMatte_plus.safetensors"
 }
 
+# Files to fetch from Manojb/stable-diffusion-2-1-base (configs only)
+SD21_MANOJB_FILES = {
+    "model_index.json": "model_index.json",
+    "text_encoder/config.json": "text_encoder/config.json",
+    "vae/config.json": "vae/config.json",
+    "unet/config.json": "unet/config.json",
+    "scheduler/scheduler_config.json": "scheduler/scheduler_config.json",
+    "tokenizer/tokenizer_config.json": "tokenizer/tokenizer_config.json",
+    "tokenizer/merges.txt": "tokenizer/merges.txt",
+    "tokenizer/vocab.json": "tokenizer/vocab.json",
+    "tokenizer/special_tokens_map.json": "tokenizer/special_tokens_map.json",
+    "feature_extractor/preprocessor_config.json": "feature_extractor/preprocessor_config.json",
+}
+
+
+def ensure_sd21_from_manojb(sd21_base_dir=None):
+    """
+    Ensure Stable Diffusion 2.1 base config files exist under diffusers/stable-diffusion-2-1-base.
+    Downloads missing config files from Manojb/stable-diffusion-2-1-base on Hugging Face.
+    """
+    diffusers_paths = folder_paths.get_folder_paths("diffusers") or []
+    if sd21_base_dir is None:
+        if not diffusers_paths:
+            # fallback to ComfyUI models_dir/diffusers
+            sd21_base_dir = os.path.join(folder_paths.models_dir, "diffusers", "stable-diffusion-2-1-base")
+        else:
+            sd21_base_dir = os.path.join(diffusers_paths[0], "stable-diffusion-2-1-base")
+
+    os.makedirs(sd21_base_dir, exist_ok=True)
+
+    # check which files are missing
+    missing = []
+    for rel_path in SD21_MANOJB_FILES.keys():
+        target = os.path.join(sd21_base_dir, rel_path)
+        if not os.path.isfile(target):
+            missing.append(rel_path)
+
+    if not missing:
+        print(f"[SDMatte] SD 2.1 configs already present at: {sd21_base_dir}")
+        return sd21_base_dir
+
+    base_url = "https://huggingface.co/Manojb/stable-diffusion-2-1-base/resolve/main"
+    try:
+        import requests
+        try:
+            from tqdm import tqdm
+        except Exception:
+            tqdm = None
+    except Exception:
+        requests = None
+        tqdm = None
+
+    for rel_path in missing:
+        url = f"{base_url}/{rel_path}"
+        target = os.path.join(sd21_base_dir, rel_path)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        print(f"[SDMatte] Downloading {rel_path} from Manojb -> {target}")
+        try:
+            if requests:
+                tmp = target + ".tmp"
+                resp = requests.get(url, stream=True, timeout=60)
+                resp.raise_for_status()
+                total = int(resp.headers.get("content-length", 0) or 0)
+                with open(tmp, "wb") as f:
+                    bar = None
+                    if tqdm and total > 0:
+                        bar = tqdm(desc=rel_path, total=total, unit="iB", unit_scale=True, unit_divisor=1024)
+                    for chunk in resp.iter_content(1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
+                            if bar:
+                                bar.update(len(chunk))
+                    if bar:
+                        bar.close()
+                os.replace(tmp, target)
+            else:
+                import urllib.request
+                urllib.request.urlretrieve(url, target)
+            print(f"[SDMatte] Downloaded {rel_path}")
+        except Exception as e:
+            print(f"[SDMatte] Warning: failed to download {rel_path}: {e}")
+
+    return sd21_base_dir
+
 def download_model(model_name, models_dir=MODEL_DIR, model_urls=MODEL_URLS):
     # 1) Search in all registered SDMatte paths first
     all_search_paths = folder_paths.get_folder_paths("SDMatte") or []
@@ -188,7 +272,16 @@ class SDMatteApply:
                 break
 
         if pretrained_repo is None:
-            raise FileNotFoundError("Stable Diffusion 2.1 base model not found in diffusers directory. Please download it from https://huggingface.co/stabilityai/stable-diffusion-2-1")
+            # not found locally — try downloading the config-only files from Manojb
+            try:
+                sd21_dir = ensure_sd21_from_manojb()
+                if sd21_dir and os.path.isdir(sd21_dir):
+                    pretrained_repo = sd21_dir
+            except Exception as e:
+                print(f"[SDMatte] Warning: failed to auto-download SD 2.1 configs: {e}")
+
+        if pretrained_repo is None:
+            raise FileNotFoundError("Stable Diffusion 2.1 base model not found in diffusers directory and auto-download failed. Please provide configs at diffusers/stable-diffusion-2-1-base or ensure network access.")
         
         sdmatte_model = SDMatteCore(
             pretrained_model_name_or_path=pretrained_repo,
